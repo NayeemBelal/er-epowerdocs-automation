@@ -181,8 +181,8 @@ def _set_paper_source(app: Application) -> None:
     try:
         paper_source = props_dialog.child_window(auto_id="1202", control_type="ComboBox")
         paper_source.wait("visible enabled", timeout=settings.ui_timeout)
-        paper_source.select("Multipurpose Tray")
-        logger.info("Paper Source set to Multipurpose Tray.")
+        paper_source.select("Multipurpose tray")
+        logger.info("Paper Source set to Multipurpose tray.")
     except PWTimeoutError:
         logger.error("Paper Source combobox not found.")
         raise RuntimeError("Paper Source combobox unavailable.")
