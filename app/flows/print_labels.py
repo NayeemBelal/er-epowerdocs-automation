@@ -42,8 +42,8 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
         logger.error("Tracking grid not found on main screen.")
         raise RuntimeError("Could not locate patient tracking grid on main screen.")
 
-    # EPD displays names as "LAST, FIRST" — build the expected string.
-    target = f"{payload.last_name}, {payload.first_name}".upper()
+    # EPD displays names as "LAST, F." (last name + first initial + period).
+    target = f"{payload.last_name}, {payload.first_name[0]}.".upper()
 
     for row_index in range(_MAX_ROWS):
         cell_title = f"Pt Name Row {row_index}"
