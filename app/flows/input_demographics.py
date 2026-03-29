@@ -32,7 +32,7 @@ def _set_edit(parent, auto_id: str, value: str, field_name: str) -> None:
     try:
         field = parent.child_window(auto_id=auto_id, control_type="Edit")
         field.wait("visible enabled", timeout=settings.ui_timeout)
-        field.set_edit_text(value)
+        field.set_edit_text(value.upper())
         logger.info("Edit set: %s", field_name)
     except PWTimeoutError:
         logger.error("Edit field not found: %s", field_name)
