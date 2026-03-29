@@ -61,7 +61,7 @@ def _set_list(parent, auto_id: str, value: str, field_name: str) -> None:
     try:
         list_box = parent.child_window(auto_id=auto_id, control_type="List")
         list_box.wait("visible", timeout=settings.ui_timeout)
-        list_box.select(value)
+        list_box.child_window(title=value, control_type="ListItem").select()
         logger.info("ListBox set: %s", field_name)
     except PWTimeoutError:
         logger.error("ListBox not found: %s", field_name)
