@@ -181,11 +181,12 @@ def _set_paper_source(app: Application) -> None:
     try:
         paper_source = props_dialog.child_window(auto_id="1202", control_type="ComboBox")
         paper_source.wait("visible enabled", timeout=settings.ui_timeout)
-        paper_source.select("Multipurpose tray")
+        paper_source.click_input()
+        paper_source.child_window(title="Multipurpose tray", control_type="ListItem").click_input()
         logger.info("Paper Source set to Multipurpose tray.")
     except PWTimeoutError:
-        logger.error("Paper Source combobox not found.")
-        raise RuntimeError("Paper Source combobox unavailable.")
+        logger.error("Paper Source combobox or item not found.")
+        raise RuntimeError("Paper Source combobox or Multipurpose tray option unavailable.")
     except Exception:
         logger.exception("Failed to select Multipurpose tray from Paper Source.")
         raise RuntimeError("Could not select Multipurpose tray — verify option name matches exactly.")
@@ -212,7 +213,7 @@ def _click_print_dialog_ok(app: Application) -> None:
         raise RuntimeError("Print dialog not visible when trying to click OK.")
 
     try:
-        ok_btn = print_dialog.child_window(auto_id="1", control_type="Button")
+        ok_btn = print_dialog.child_window(title="OK", control_type="Button")
         ok_btn.wait("visible enabled", timeout=settings.ui_timeout)
         ok_btn.click_input()
         logger.info("Print dialog OK clicked — job sent to printer.")
