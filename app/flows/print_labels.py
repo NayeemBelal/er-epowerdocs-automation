@@ -35,8 +35,11 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
     try:
         main_win = app.window(auto_id="frmMain")
         main_win.set_focus()
-        grid = main_win.child_window(auto_id="PNGeneral", control_type="Pane").child_window(
-            auto_id="dgvTracking", control_type="Table"
+        grid = (
+            main_win
+            .child_window(auto_id="pnList2", control_type="Pane")
+            .child_window(auto_id="epCtrTB", control_type="Pane")
+            .child_window(auto_id="dgvTracking", control_type="Table")
         )
         grid.wait("visible", timeout=settings.ui_timeout)
         logger.info("Tracking grid located.")
