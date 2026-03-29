@@ -34,16 +34,20 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
     """
     try:
         main_win = app.window(auto_id="frmMain")
+        logger.info("frmMain window wrapper created.")
         main_win.set_focus()
+        logger.info("frmMain focused.")
         grid = main_win.child_window(auto_id="dgvTracking", control_type="Table")
+        logger.info("dgvTracking wrapper created, waiting for visible...")
         grid.wait("visible", timeout=settings.ui_timeout)
-        logger.info("Tracking grid located.")
+        logger.info("Tracking grid located and visible.")
     except PWTimeoutError:
-        logger.error("Tracking grid not found on main screen.")
+        logger.error("Tracking grid not found — dgvTracking did not become visible within timeout.")
         raise RuntimeError("Could not locate patient tracking grid on main screen.")
 
-    # EPD displays names as "LAST, F." (last name + first initial + period).
+    # EPD displays names as "LAST, F" (last name + first initial, no period).
     target = f"{payload.last_name}, {payload.first_name[0]}".upper()
+    logger.info("Target name length: %d, contains comma: %s", len(target), "," in target)
 
     for row_index in range(_MAX_ROWS):
         cell_title = f"Pt Name Row {row_index}"
@@ -51,16 +55,20 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
             cell = grid.child_window(title=cell_title, control_type="Edit")
             cell.wait("exists", timeout=1)
         except PWTimeoutError:
-            # No more rows — patient not found.
+            logger.info("No cell found at row %d — end of patient list (%d rows scanned).", row_index, row_index)
             break
 
         cell_text = cell.window_text().strip().upper()
+        logger.info(
+            "Row %d: cell_text length=%d, target length=%d, match=%s",
+            row_index, len(cell_text), len(target), cell_text == target,
+        )
         if cell_text == target:
             cell.click_input()
-            logger.info("Patient row clicked (row index hidden for HIPAA).")
+            logger.info("Patient row clicked at row %d.", row_index)
             return
 
-    logger.error("Patient not found in tracking grid.")
+    logger.error("Patient not found after scanning %d rows.", min(row_index + 1, _MAX_ROWS))
     raise RuntimeError("Patient not found in the EPD tracking grid.")
 
 
