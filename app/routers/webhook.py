@@ -13,7 +13,9 @@ from fastapi import APIRouter, Header, HTTPException, status
 
 from app.config import settings
 from app.models.register_patient import RegisterPatientPayload
+from app.models.print_labels import PrintLabelsPayload
 from app.flows import register_patient as register_patient_flow
+from app.flows import print_labels as print_labels_flow
 
 logger = logging.getLogger(__name__)
 
@@ -70,3 +72,14 @@ async def webhook_register(
     _verify_secret(x_webhook_secret)
     logger.info("Register patient webhook received.")
     return await _run_flow(register_patient_flow.run, payload)
+
+
+@router.post("/print-labels", status_code=status.HTTP_200_OK)
+async def webhook_print_labels(
+    payload: PrintLabelsPayload,
+    x_webhook_secret: str = Header(..., alias="X-Webhook-Secret"),
+):
+    """Select a patient on the EPD main screen to begin the print labels flow."""
+    _verify_secret(x_webhook_secret)
+    logger.info("Print labels webhook received.")
+    return await _run_flow(print_labels_flow.run, payload)
