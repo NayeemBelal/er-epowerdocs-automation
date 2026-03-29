@@ -129,6 +129,51 @@ def _click_new_patient(search_win) -> None:
         raise RuntimeError("New Patient button unavailable.")
 
 
+def _fill_registration_screen(search_win, payload: PatientPayload) -> None:
+    """
+    Fill the Registration screen that opens after clicking New Patient.
+    Enters cell number, then clicks Save and Close.
+    """
+    try:
+        reg_win = search_win.child_window(auto_id="frmRegistration", control_type="Window")
+        reg_win.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Registration screen is visible.")
+    except PWTimeoutError:
+        logger.error("Registration screen did not appear.")
+        raise RuntimeError("Registration screen did not open in time.")
+
+    # Uncheck 'No cell phone number' if it is checked, so the field is enabled
+    try:
+        no_cell_chk = reg_win.child_window(auto_id="chkNoCellPhone", control_type="CheckBox")
+        no_cell_chk.wait("visible", timeout=settings.ui_timeout)
+        if no_cell_chk.get_toggle_state() == 1:
+            no_cell_chk.click_input()
+            logger.info("Unchecked 'No cell phone number'.")
+    except PWTimeoutError:
+        logger.warning("'No cell phone number' checkbox not found — skipping.")
+
+    # Fill cell number
+    try:
+        cell_edit = reg_win.child_window(auto_id="txtCell", control_type="Edit")
+        cell_edit.wait("visible enabled", timeout=settings.ui_timeout)
+        cell_edit.set_edit_text("")
+        cell_edit.type_keys(payload.cell_number, with_spaces=True)
+        logger.info("Cell number field filled.")
+    except PWTimeoutError:
+        logger.error("Cell number field not found.")
+        raise RuntimeError("Cell number field unavailable.")
+
+    # Save and Close
+    try:
+        save_btn = reg_win.child_window(auto_id="btnSaveClose", control_type="Button")
+        save_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        save_btn.click_input()
+        logger.info("Save and Close clicked.")
+    except PWTimeoutError:
+        logger.error("Save and Close button not found.")
+        raise RuntimeError("Save and Close button unavailable.")
+
+
 # ── Public orchestrator ───────────────────────────────────────────────────────
 
 def register_patient(payload: PatientPayload) -> dict:
@@ -145,6 +190,7 @@ def register_patient(payload: PatientPayload) -> dict:
     search_win = _open_add_patient(app)
     _inject_patient_data(search_win, payload)
     _click_new_patient(search_win)
+    _fill_registration_screen(search_win, payload)
 
-    logger.info("Registration workflow completed — New Patient submitted.")
+    logger.info("Registration workflow completed — patient saved.")
     return {"status": "success"}

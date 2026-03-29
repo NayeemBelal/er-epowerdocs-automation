@@ -17,6 +17,7 @@ class PatientPayload(BaseModel):
     last_name: str
     dob: str            # Expected format: YYYY-MM-DD
     gender: str         # "M" or "F"
+    cell_number: str
     chief_complaint: str
     insurance_id: str
 
