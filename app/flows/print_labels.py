@@ -139,6 +139,30 @@ def _fill_provider_name(app: Application, provider_name: str) -> None:
         raise RuntimeError("Record button unavailable.")
 
 
+def _click_print_icon(app: Application) -> None:
+    """
+    In the Document Viewer (frmTemplatePreview), click the Print toolbar icon.
+    """
+    try:
+        main_win = app.window(auto_id="frmMain")
+        viewer = main_win.child_window(auto_id="frmTemplatePreview", control_type="Window")
+        viewer.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Document Viewer visible.")
+    except PWTimeoutError:
+        logger.error("Document Viewer did not appear.")
+        raise RuntimeError("Document Viewer did not open after clicking View.")
+
+    try:
+        toolbar = viewer.child_window(auto_id="mainToolstrip", control_type="ToolBar")
+        print_btn = toolbar.child_window(title="Print", control_type="Button")
+        print_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        print_btn.click_input()
+        logger.info("Print icon clicked.")
+    except PWTimeoutError:
+        logger.error("Print icon not found in toolbar.")
+        raise RuntimeError("Print icon unavailable in Document Viewer toolbar.")
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def run(payload: PrintLabelsPayload) -> dict:
@@ -156,6 +180,7 @@ def run(payload: PrintLabelsPayload) -> dict:
     _click_patient_row(app, payload)
     _select_registration_labels(app)
     _fill_provider_name(app, provider_name)
+    _click_print_icon(app)
 
     logger.info("Print labels flow completed.")
     return {"status": "success"}
