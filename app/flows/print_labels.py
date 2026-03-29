@@ -1,14 +1,9 @@
 """
 flows/print_labels.py — Print registration labels flow.
 
-Step 1: Click the correct patient row on the EPD main tracking screen.
-
-The main screen (frmMain → PNGeneral → dgvTracking) shows a DataGridView
-of current patients. Each row's patient name cell has a stable title of
-"Pt Name Row N" (N = 0, 1, 2, ...). We iterate rows until we find one
-whose displayed text matches the requested patient, then click it.
-
-EPD displays names in "LAST, FIRST" format. Matching is case-insensitive.
+1. Click the correct patient row on the EPD main tracking screen.
+2. In the Patient Menu (frmPatMenu), check Registration Labels.
+3. Click View.
 
 HIPAA: no PHI values appear in any log call.
 """
@@ -34,11 +29,8 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
     """
     try:
         main_win = app.window(auto_id="frmMain")
-        logger.info("frmMain window wrapper created.")
         main_win.set_focus()
-        logger.info("frmMain focused.")
         grid = main_win.child_window(auto_id="dgvTracking", control_type="Table")
-        logger.info("dgvTracking wrapper created, waiting for visible...")
         grid.wait("visible", timeout=settings.ui_timeout)
         logger.info("Tracking grid located and visible.")
     except PWTimeoutError:
@@ -47,7 +39,6 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
 
     # EPD displays names as "LAST, F" (last name + first initial, no period).
     target = f"{payload.last_name}, {payload.first_name[0]}".upper()
-    logger.info("Target name length: %d, contains comma: %s", len(target), "," in target)
 
     for row_index in range(_MAX_ROWS):
         cell_title = f"Pt Name Row {row_index}"
@@ -55,21 +46,50 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
             cell = grid.child_window(title=cell_title, control_type="Edit")
             cell.wait("exists", timeout=1)
         except PWTimeoutError:
-            logger.info("No cell found at row %d — end of patient list (%d rows scanned).", row_index, row_index)
+            logger.info("End of patient list — %d rows scanned.", row_index)
             break
 
         cell_text = cell.get_value().strip().upper()
-        logger.info(
-            "Row %d: cell_text length=%d, target length=%d, match=%s",
-            row_index, len(cell_text), len(target), cell_text == target,
-        )
         if cell_text == target:
             cell.click_input()
-            logger.info("Patient row clicked at row %d.", row_index)
+            logger.info("Patient row clicked.")
             return
 
     logger.error("Patient not found after scanning %d rows.", min(row_index + 1, _MAX_ROWS))
     raise RuntimeError("Patient not found in the EPD tracking grid.")
+
+
+def _select_registration_labels(app: Application) -> None:
+    """
+    In the Patient Menu, check Registration Labels then click View.
+    """
+    try:
+        main_win = app.window(auto_id="frmMain")
+        pat_menu = main_win.child_window(auto_id="frmPatMenu", control_type="Window")
+        pat_menu.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Patient Menu visible.")
+    except PWTimeoutError:
+        logger.error("Patient Menu did not appear.")
+        raise RuntimeError("Patient Menu did not open after selecting patient.")
+
+    try:
+        chk = pat_menu.child_window(auto_id="cbRegistrationLabels", control_type="CheckBox")
+        chk.wait("visible enabled", timeout=settings.ui_timeout)
+        if chk.get_toggle_state() != 1:
+            chk.click_input()
+        logger.info("Registration Labels checked.")
+    except PWTimeoutError:
+        logger.error("Registration Labels checkbox not found.")
+        raise RuntimeError("Registration Labels checkbox unavailable.")
+
+    try:
+        view_btn = pat_menu.child_window(auto_id="cmdPreview", control_type="Button")
+        view_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        view_btn.click_input()
+        logger.info("View clicked.")
+    except PWTimeoutError:
+        logger.error("View button not found.")
+        raise RuntimeError("View button unavailable.")
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -84,6 +104,7 @@ def run(payload: PrintLabelsPayload) -> dict:
 
     app = connect_to_epower()
     _click_patient_row(app, payload)
+    _select_registration_labels(app)
 
-    logger.info("Print labels flow: patient selected.")
+    logger.info("Print labels flow completed.")
     return {"status": "success"}
