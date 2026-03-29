@@ -55,7 +55,8 @@ def _open_add_patient(app: Application):
         raise RuntimeError("Could not locate ADD Patient button on main screen.")
 
     try:
-        search_win = app.window(auto_id="frmPatientSearch")
+        main_win = app.window(auto_id="frmMain")
+        search_win = main_win.child_window(auto_id="frmPatientSearch", control_type="Window")
         search_win.wait("visible", timeout=settings.ui_timeout)
         logger.info("Patient Search window is visible.")
         return search_win
