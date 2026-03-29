@@ -55,17 +55,20 @@ def _set_combo(parent, auto_id: str, value: str, field_name: str) -> None:
 
 
 def _set_list(parent, auto_id: str, value: str, field_name: str) -> None:
-    """Click a ListItem inside a ListBox control."""
+    """Select an item in a ListBox control by text."""
     if not value:
         return
     try:
         list_box = parent.child_window(auto_id=auto_id, control_type="List")
         list_box.wait("visible", timeout=settings.ui_timeout)
-        list_box.child_window(title=value, control_type="ListItem").click_input()
+        list_box.select(value)
         logger.info("ListBox set: %s", field_name)
     except PWTimeoutError:
-        logger.error("ListBox or item not found: %s", field_name)
-        raise RuntimeError(f"{field_name} option unavailable in Registration screen.")
+        logger.error("ListBox not found: %s", field_name)
+        raise RuntimeError(f"{field_name} ListBox unavailable in Registration screen.")
+    except Exception:
+        logger.exception("Failed to select item in ListBox: %s", field_name)
+        raise RuntimeError(f"Could not select {field_name} — verify option name matches exactly.")
 
 
 # ── Flow steps ────────────────────────────────────────────────────────────────
@@ -166,8 +169,17 @@ def _fill_demographics(app: Application, payload: InputDemographicsPayload) -> N
     # Race — ListBox, not ComboBox
     _set_list(pat_info, "LstRace", payload.race, "race")
 
-    # How did you hear about us — optional, no EPD default
-    _set_combo(pat_info, "cbAboutUsSource", payload.how_did_you_hear, "how did you hear about us")
+    # How did you hear about us — free-text input inside a ComboBox, optional
+    if payload.how_did_you_hear:
+        try:
+            combo = pat_info.child_window(auto_id="cbAboutUsSource", control_type="ComboBox")
+            combo.wait("visible enabled", timeout=settings.ui_timeout)
+            edit = combo.child_window(auto_id="1001", control_type="Edit")
+            edit.set_edit_text(payload.how_did_you_hear.upper())
+            logger.info("How did you hear about us set.")
+        except PWTimeoutError:
+            logger.error("How did you hear about us field not found.")
+            raise RuntimeError("How did you hear about us field unavailable in Registration screen.")
 
     # Save and Close
     try:
