@@ -1,22 +1,21 @@
-from pydantic import BaseModel, ConfigDict, field_validator
 import re
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
-class PatientPayload(BaseModel):
+class RegisterPatientPayload(BaseModel):
     """
-    Inbound PHI payload from the webhook.
+    Inbound PHI payload for the patient registration flow.
 
-    HIPAA note: This model exists only in volatile RAM during request
-    processing. It must never be serialized to disk, included in log
-    output, or persisted in any form.
+    HIPAA: exists only in volatile RAM during request processing.
+    Must never be serialized to disk, logged, or persisted.
     """
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     first_name: str
     last_name: str
-    dob: str            # Expected format: YYYY-MM-DD
-    gender: str         # "M" or "F"
+    dob: str        # YYYY-MM-DD
+    gender: str     # "M" or "F"
     cell_number: str
     chief_complaint: str
     insurance_id: str
