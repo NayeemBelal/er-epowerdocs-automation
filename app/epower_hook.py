@@ -101,6 +101,17 @@ def _inject_patient_data(search_win, payload: PatientPayload) -> None:
     _fill_edit(search_win, "txtDay",       day,                "dob_day")
     _fill_edit(search_win, "txtYear",      year,               "dob_year")
 
+    # Select gender radio button (M or F)
+    gender_auto_id = "rbM" if payload.gender == "M" else "rbF"
+    try:
+        gender_btn = search_win.child_window(auto_id=gender_auto_id, control_type="RadioButton")
+        gender_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        gender_btn.click_input()
+        logger.info("Gender radio button selected.")
+    except PWTimeoutError:
+        logger.error("Gender radio button not found.")
+        raise RuntimeError("Gender radio button unavailable.")
+
     logger.info("All patient fields injected.")
 
 

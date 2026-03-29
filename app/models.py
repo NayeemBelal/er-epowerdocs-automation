@@ -16,6 +16,7 @@ class PatientPayload(BaseModel):
     first_name: str
     last_name: str
     dob: str            # Expected format: YYYY-MM-DD
+    gender: str         # "M" or "F"
     chief_complaint: str
     insurance_id: str
 
@@ -24,4 +25,12 @@ class PatientPayload(BaseModel):
     def validate_dob_format(cls, v: str) -> str:
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
             raise ValueError("dob must be in YYYY-MM-DD format")
+        return v
+
+    @field_validator("gender")
+    @classmethod
+    def validate_gender(cls, v: str) -> str:
+        v = v.upper()
+        if v not in ("M", "F"):
+            raise ValueError("gender must be 'M' or 'F'")
         return v
