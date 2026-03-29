@@ -1,0 +1,40 @@
+# ── Environment & Secrets ─────────────────────────────────────────────────────
+# NEVER commit .env — it may contain PHI credentials or webhook secrets
+.env
+*.env
+!.env.example
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# ── Virtual Environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Logs (belt-and-suspenders — PHI must never land on disk) ──────────────────
+*.log
+logs/
+
+# ── Distribution / Packaging ──────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+
+# ── IDE & OS ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── pyinstaller (if bundled later) ────────────────────────────────────────────
+*.spec
