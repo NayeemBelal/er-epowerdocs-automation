@@ -38,6 +38,3 @@ Thumbs.db
 
 # ── pyinstaller (if bundled later) ────────────────────────────────────────────
 *.spec
-
-# ── EPD UI inspection outputs (may contain PHI control data) ──────────────────
-inspect_*.md
