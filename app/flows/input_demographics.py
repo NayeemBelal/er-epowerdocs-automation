@@ -155,7 +155,7 @@ def _fill_demographics(app: Application, payload: InputDemographicsPayload) -> N
 
     # Dropdowns with defaults
     _set_combo(pat_info, "cbMarital",           payload.marital_status,    "marital status")
-    _set_combo(pat_info, "cbEmployment",         payload.employment_status, "employment status")
+    _set_combo(pat_info, "cbEmployment", "Employed" if payload.employer_name else "Unknown", "employment status")
     _set_combo(pat_info, "cbReligion",           payload.religion,          "religion")
     _set_combo(pat_info, "cbPreferredLanguage",  payload.preferred_language, "preferred language")
     _set_combo(pat_info, "cbEtnicity",           payload.ethnicity,         "ethnicity")
@@ -224,6 +224,96 @@ def _fill_guarantor(app: Application, payload: InputDemographicsPayload) -> None
             raise RuntimeError("Same phones checkbox unavailable.")
 
 
+def _fill_employer_tab(app: Application, payload: InputDemographicsPayload) -> None:
+    """Click the Employer tab and fill in the Employer Name field."""
+    if not payload.employer_name:
+        return
+
+    try:
+        main_win = app.window(auto_id="frmMain")
+        reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
+        reg_win.child_window(title="Employer", control_type="TabItem").click_input()
+        logger.info("Employer tab clicked.")
+    except Exception:
+        logger.error("Employer tab not found.")
+        raise RuntimeError("Employer tab unavailable on Registration screen.")
+
+    try:
+        main_win = app.window(auto_id="frmMain")
+        reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
+        emp_pane = reg_win.child_window(auto_id="tbEmp", control_type="Pane")
+        emp_pane.child_window(auto_id="txtEmpName", control_type="Edit").set_edit_text(payload.employer_name.upper())
+        logger.info("Employer name filled.")
+    except Exception:
+        logger.error("Employer Name field not found.")
+        raise RuntimeError("Employer Name field unavailable on Employer tab.")
+
+
+def _fill_primary_ins_tab(app: Application, payload: InputDemographicsPayload) -> None:
+    """
+    Click the Primary Ins. tab and fill the Insured + Insurance sections.
+    Skipped entirely if ins_name is not provided.
+    """
+    if not payload.ins_name:
+        return
+
+    try:
+        main_win = app.window(auto_id="frmMain")
+        reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
+        reg_win.child_window(title="Primary Ins.", control_type="TabItem").click_input()
+        logger.info("Primary Ins. tab clicked.")
+    except Exception:
+        logger.error("Primary Ins. tab not found.")
+        raise RuntimeError("Primary Ins. tab unavailable on Registration screen.")
+
+    main_win = app.window(auto_id="frmMain")
+    reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
+    pane = reg_win.child_window(auto_id="tbPri", control_type="Pane")
+
+    # Insured section — Same as Patient (adult) or Same as Guarantor (minor)
+    is_minor = bool(payload.guardian_first_name and payload.guardian_last_name)
+    insured = pane.child_window(auto_id="GroupBox3", control_type="Group")
+    chk_id = "ck1SameAsGuarantor" if is_minor else "ck1SameAsPatient"
+    chk_name = "Same as Guarantor" if is_minor else "Same as Patient"
+    try:
+        chk = insured.child_window(auto_id=chk_id, control_type="CheckBox")
+        if chk.get_toggle_state() != 1:
+            chk.click_input()
+        logger.info("Insured: %s checked.", chk_name)
+    except Exception:
+        logger.error("Insured checkbox not found: %s", chk_name)
+        raise RuntimeError(f"{chk_name} checkbox unavailable on Primary Ins. tab.")
+
+    # Insurance section
+    ins = pane.child_window(auto_id="GroupBox2", control_type="Group")
+
+    # Insurance Name — free-text combo
+    try:
+        ins.child_window(auto_id="cb1InsName", control_type="ComboBox") \
+           .child_window(auto_id="1001", control_type="Edit") \
+           .set_edit_text(payload.ins_name.upper())
+        logger.info("Insurance name set.")
+    except Exception:
+        logger.error("Insurance Name field not found.")
+        raise RuntimeError("Insurance Name field unavailable.")
+
+    # Insurance Type — dropdown
+    _set_combo(ins, "cb1InsType", payload.ins_type, "insurance type")
+
+    # Address / contact fields
+    _set_edit(ins, "txt1InsAdd1",   payload.ins_address,       "insurance address")
+    _set_edit(ins, "txt1InsCity",   payload.ins_city,          "insurance city")
+    _set_edit(ins, "txt1InsState",  payload.ins_state,         "insurance state")
+    _set_edit(ins, "txt1InsZip",    payload.ins_zip,           "insurance zip")
+    _set_edit(ins, "txt1InsPhone",  payload.ins_phone,         "insurance phone")
+
+    # Policy / group numbers
+    _set_edit(ins, "txt1InsPolicy", payload.ins_policy_number, "policy number")
+    _set_edit(ins, "txt1InsGroup",  payload.ins_group_number,  "group number")
+
+    logger.info("Primary Ins. tab filled.")
+
+
 def _save_and_close(app: Application) -> None:
     """Click Save and Close on the Registration screen."""
     try:
@@ -254,6 +344,8 @@ def run(payload: InputDemographicsPayload) -> dict:
     _click_demographics(app)
     _fill_demographics(app, payload)
     _fill_guarantor(app, payload)
+    _fill_employer_tab(app, payload)
+    _fill_primary_ins_tab(app, payload)
     _save_and_close(app)
 
     logger.info("Input demographics flow completed.")

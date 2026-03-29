@@ -29,7 +29,7 @@ class InputDemographicsPayload(BaseModel):
     # Identity — all have EPD-safe defaults
     ssn: str = "000000000"
     marital_status: str = "Unknown"
-    employment_status: str = "Unknown"
+    employer_name: Optional[str] = None  # non-null → sets status to Employed + fills Employer tab
     religion: str = "Unknown"
     race: str = "Declined to Specify"
     ethnicity: str = "Declined to Specify"
@@ -41,3 +41,14 @@ class InputDemographicsPayload(BaseModel):
     # Guarantor — omit both for adults (Same as Patient); provide both for minors
     guardian_first_name: Optional[str] = None
     guardian_last_name: Optional[str] = None
+
+    # Primary insurance — omit ins_name to skip the Primary Ins. tab entirely
+    ins_name: Optional[str] = None
+    ins_type: Optional[str] = None
+    ins_address: Optional[str] = None
+    ins_city: Optional[str] = None
+    ins_state: Optional[str] = None
+    ins_zip: Optional[str] = None
+    ins_phone: Optional[str] = None
+    ins_policy_number: Optional[str] = None
+    ins_group_number: Optional[str] = None
