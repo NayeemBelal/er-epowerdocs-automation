@@ -62,6 +62,7 @@ The web dashboard sends patient data to a secure tunnel URL. The tunnel forwards
 er-epowerdocs-automation/
 │
 ├── main.py                        # Entry point — creates FastAPI app, mounts router
+├── config.yaml                    # Non-secret runtime config (provider names, etc.)
 │
 ├── app/
 │   ├── config.py                  # Loads settings from .env (Pydantic Settings)
@@ -70,22 +71,21 @@ er-epowerdocs-automation/
 │   │   └── epd_connect.py         # Shared EPD process connection (used by all flows)
 │   │
 │   ├── models/
-│   │   └── register_patient.py    # Pydantic payload model for registration flow
+│   │   ├── register_patient.py    # Pydantic payload model for registration flow
+│   │   └── print_labels.py        # Pydantic payload model for print labels flow
 │   │
 │   ├── flows/
-│   │   └── register_patient.py    # Full registration automation logic
+│   │   ├── register_patient.py    # Full registration automation logic
+│   │   └── print_labels.py        # Print registration labels automation logic
 │   │
 │   └── routers/
 │       └── webhook.py             # All HTTP endpoints + shared flow dispatcher
 │
 ├── inspect_epd.py                 # Dev utility: prints EPD UI control identifiers
-├── inspect_add_pt.md              # Output of inspect_epd.py on the Add Patient screen
-├── inspect_add_existing_pt.md     # Output with an existing patient visible in results
-├── inspect_registration_pt.md     # Output of the Registration screen
 │
 ├── requirements.txt
 ├── .env.example                   # Safe template — copy to .env and fill in values
-├── .gitignore                     # .env is strictly gitignored
+├── .gitignore                     # .env and inspect_*.md files are gitignored
 └── README.md
 ```
 
@@ -130,6 +130,55 @@ Registers a new patient or opens an existing one in EPOWERdoc.
 5. **If an existing patient appears** in the results grid (`lLName0`) → clicks their row
 6. **If no match** → clicks the **New Patient** button (`auto_id="cmdAddVisit"`)
 7. On the Registration screen: unchecks "No cell phone number" if needed, fills the Cell field (`auto_id="txtCell"`), clicks **Save and Close** (`auto_id="btnSaveClose"`)
+
+### 2. Print Registration Labels — `POST /webhook/print-labels`
+
+Prints the registration labels for a patient already checked in and visible on the EPD main tracking screen.
+
+**Payload:**
+```json
+{
+  "first_name": "John",
+  "last_name":  "Doe"
+}
+```
+
+**Provider configuration (`config.yaml`):**
+
+The provider name printed on the label is not sent in the webhook payload — it is read from `config.yaml` at runtime:
+
+```yaml
+providers:
+  names:
+    - DR. SMITH, JANE
+    - DR. DOE, JOHN
+  selected_index: 0
+```
+
+Set `selected_index` to the index of the active provider. The selected name is typed into EPD's Add Provider dialog during the flow.
+
+**Workflow:**
+1. Connects to the running `EPD.exe` process via pywinauto UIA backend
+2. Locates the patient in the main tracking grid (`dgvTracking`) by matching `"LAST, F"` format (last name + first initial, case-insensitive) and clicks their row
+3. In the **Patient Menu** (`frmPatMenu`): checks the **Registration Labels** checkbox (`cbRegistrationLabels`) — skips the click if already checked — then clicks **View** (`cmdPreview`)
+4. In the **Add Provider** dialog (`frmInputBox`): types the provider name from `config.yaml` into the text box (`TextBox1`) and clicks **Record** (`btnOk`)
+5. In the **EPOWERdoc Document Viewer** (`frmTemplatePreview`): clicks the **Print icon** in the toolbar (`mainToolstrip`)
+6. In the Windows **Print** dialog: clicks **Properties...** (`auto_id="1025"`)
+7. In **Document Properties**: opens the **Paper Source** dropdown (`auto_id="1202"`) and selects **Multipurpose tray**, then clicks **OK**
+8. Back in the Print dialog: clicks **OK** to send the job to the printer
+9. Clicks **Exit** on the Document Viewer (`btnExit`)
+10. Clicks **Exit** on the Patient Menu (`cmdClose`)
+
+**curl (PowerShell):**
+```powershell
+$headers = @{
+    "Content-Type"     = "application/json"
+    "X-Webhook-Secret" = "your_secret_here"
+}
+$body = '{"first_name":"John","last_name":"Doe"}'
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/webhook/print-labels" -Method POST -Headers $headers -Body $body
+```
 
 ---
 
@@ -236,3 +285,4 @@ Paste the output into a `.md` file in the repo for reference (see `inspect_add_p
 - [ ] PyInstaller `.exe` build via GitHub Actions for non-technical staff deployment
 - [ ] Cloudflare / Ngrok tunnel configuration documentation
 - [ ] Retry logic for transient UI timing failures
+- [ ] Surface `config.yaml` provider switching via a webhook endpoint so staff can change the active provider without editing the file
