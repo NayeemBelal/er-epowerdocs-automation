@@ -9,6 +9,7 @@ HIPAA compliance rules for this module:
 """
 
 import logging
+import time
 from pywinauto import Application
 from pywinauto.timings import TimeoutError as PWTimeoutError
 
@@ -43,7 +44,6 @@ def _open_add_patient(app: Application):
         main_win = app.window(auto_id="frmMain")
         main_win.set_focus()
 
-        # Click the 'ADD Patient' static text link in the registration panel
         add_btn = main_win.child_window(auto_id="PNGeneral").child_window(
             auto_id="L1", control_type="Text"
         )
@@ -67,8 +67,8 @@ def _open_add_patient(app: Application):
 
 def _fill_edit(parent_win, pane_auto_id: str, value: str, label: str) -> None:
     """
-    Helper: locate a field by its parent Pane auto_id, then type into the
-    inner Edit control (all text fields in this form follow this pattern).
+    Locate a field by its parent Pane auto_id, then type into the inner Edit.
+    All text fields on the Patient Search form follow this nested pattern.
     """
     try:
         edit = parent_win.child_window(
@@ -88,11 +88,10 @@ def _fill_edit(parent_win, pane_auto_id: str, value: str, label: str) -> None:
 
 def _inject_patient_data(search_win, payload: PatientPayload) -> None:
     """
-    Fill all patient fields in the Patient Search / New Patient form.
+    Fill all patient fields in the Patient Search form.
     DOB is split into separate month/day/year controls (mm/dd/yyyy).
     HIPAA: no field values are logged — only field-level metadata.
     """
-    # Parse DOB from YYYY-MM-DD → separate month, day, year strings
     year, month, day = payload.dob.split("-")
 
     _fill_edit(search_win, "txtLastName",  payload.last_name,  "last_name")
@@ -101,7 +100,6 @@ def _inject_patient_data(search_win, payload: PatientPayload) -> None:
     _fill_edit(search_win, "txtDay",       day,                "dob_day")
     _fill_edit(search_win, "txtYear",      year,               "dob_year")
 
-    # Select gender radio button (M or F)
     gender_auto_id = "rbM" if payload.gender == "M" else "rbF"
     try:
         gender_btn = search_win.child_window(auto_id=gender_auto_id, control_type="RadioButton")
@@ -115,15 +113,35 @@ def _inject_patient_data(search_win, payload: PatientPayload) -> None:
     logger.info("All patient fields injected.")
 
 
-def _click_new_patient(search_win) -> None:
-    """Click the 'New Patient' button to submit the registration."""
+def _select_existing_or_new(search_win) -> bool:
+    """
+    After fields are filled, EPD auto-searches and populates the results grid
+    (pn1 pane) with matching patients. The first result row has auto_id='lLName0'.
+
+    - If a match is found: click it and return True (existing patient selected).
+    - If no match: click New Patient and return False.
+    """
+    # Brief pause for EPD's auto-search to populate the results grid
+    time.sleep(1.5)
+
+    results_pane = search_win.child_window(auto_id="pn1", control_type="Pane")
+
     try:
-        new_pt_btn = search_win.child_window(
-            auto_id="cmdAddVisit", control_type="Button"
-        )
+        first_result = results_pane.child_window(auto_id="lLName0", control_type="Text")
+        first_result.wait("visible", timeout=2)
+        first_result.click_input()
+        logger.info("Existing patient found in results — row selected.")
+        return True
+    except PWTimeoutError:
+        logger.info("No existing patient in results — proceeding to New Patient.")
+
+    # No match found — click New Patient
+    try:
+        new_pt_btn = search_win.child_window(auto_id="cmdAddVisit", control_type="Button")
         new_pt_btn.wait("visible enabled", timeout=settings.ui_timeout)
         new_pt_btn.click_input()
         logger.info("New Patient button clicked.")
+        return False
     except PWTimeoutError:
         logger.error("New Patient button not found or not enabled.")
         raise RuntimeError("New Patient button unavailable.")
@@ -142,7 +160,7 @@ def _fill_registration_screen(search_win, payload: PatientPayload) -> None:
         logger.error("Registration screen did not appear.")
         raise RuntimeError("Registration screen did not open in time.")
 
-    # Uncheck 'No cell phone number' if it is checked, so the field is enabled
+    # Uncheck 'No cell phone number' if checked so the field is enabled
     try:
         no_cell_chk = reg_win.child_window(auto_id="chkNoCellPhone", control_type="CheckBox")
         no_cell_chk.wait("visible", timeout=settings.ui_timeout)
@@ -152,7 +170,6 @@ def _fill_registration_screen(search_win, payload: PatientPayload) -> None:
     except PWTimeoutError:
         logger.warning("'No cell phone number' checkbox not found — skipping.")
 
-    # Fill cell number
     try:
         cell_edit = reg_win.child_window(auto_id="txtCell", control_type="Edit")
         cell_edit.wait("visible enabled", timeout=settings.ui_timeout)
@@ -163,7 +180,6 @@ def _fill_registration_screen(search_win, payload: PatientPayload) -> None:
         logger.error("Cell number field not found.")
         raise RuntimeError("Cell number field unavailable.")
 
-    # Save and Close
     try:
         save_btn = reg_win.child_window(auto_id="btnSaveClose", control_type="Button")
         save_btn.wait("visible enabled", timeout=settings.ui_timeout)
@@ -179,7 +195,8 @@ def _fill_registration_screen(search_win, payload: PatientPayload) -> None:
 def register_patient(payload: PatientPayload) -> dict:
     """
     Full registration workflow:
-      connect → open Add Patient → fill fields → click New Patient.
+      connect → open Add Patient → fill fields → check for existing patient
+      → if existing: select them | if new: click New Patient → fill registration → save.
 
     Returns {"status": "success"} or raises RuntimeError (metadata only, no PHI).
     Called from main.py inside asyncio.run_in_executor.
@@ -189,7 +206,11 @@ def register_patient(payload: PatientPayload) -> dict:
     app = _connect_to_epower()
     search_win = _open_add_patient(app)
     _inject_patient_data(search_win, payload)
-    _click_new_patient(search_win)
+    existing = _select_existing_or_new(search_win)
+
+    if existing:
+        logger.info("Existing patient selected — registration screen should open.")
+
     _fill_registration_screen(search_win, payload)
 
     logger.info("Registration workflow completed — patient saved.")
