@@ -186,6 +186,9 @@ def _set_paper_source(app: Application) -> None:
     except PWTimeoutError:
         logger.error("Paper Source combobox not found.")
         raise RuntimeError("Paper Source combobox unavailable.")
+    except Exception:
+        logger.exception("Failed to select Multipurpose tray from Paper Source.")
+        raise RuntimeError("Could not select Multipurpose tray — verify option name matches exactly.")
 
     try:
         ok_btn = props_dialog.child_window(auto_id="1", control_type="Button")
@@ -195,6 +198,27 @@ def _set_paper_source(app: Application) -> None:
     except PWTimeoutError:
         logger.error("OK button not found in Document Properties.")
         raise RuntimeError("OK button unavailable in Document Properties dialog.")
+
+
+def _click_print_dialog_ok(app: Application) -> None:
+    """Click OK on the Windows Print dialog to send the job to the printer."""
+    try:
+        main_win = app.window(auto_id="frmMain")
+        print_dialog = main_win.child_window(title="Print", control_type="Window")
+        print_dialog.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Print dialog visible.")
+    except PWTimeoutError:
+        logger.error("Print dialog not found.")
+        raise RuntimeError("Print dialog not visible when trying to click OK.")
+
+    try:
+        ok_btn = print_dialog.child_window(auto_id="1", control_type="Button")
+        ok_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        ok_btn.click_input()
+        logger.info("Print dialog OK clicked — job sent to printer.")
+    except PWTimeoutError:
+        logger.error("OK button not found in Print dialog.")
+        raise RuntimeError("OK button unavailable in Print dialog.")
 
 
 def _click_print_icon(app: Application) -> None:
@@ -241,6 +265,7 @@ def run(payload: PrintLabelsPayload) -> dict:
     _click_print_icon(app)
     _click_properties(app)
     _set_paper_source(app)
+    _click_print_dialog_ok(app)
 
     logger.info("Print labels flow completed.")
     return {"status": "success"}
