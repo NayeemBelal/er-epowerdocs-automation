@@ -58,7 +58,7 @@ def _click_patient_row(app: Application, payload: PrintLabelsPayload) -> None:
             logger.info("No cell found at row %d — end of patient list (%d rows scanned).", row_index, row_index)
             break
 
-        cell_text = cell.window_text().strip().upper()
+        cell_text = cell.get_value().strip().upper()
         logger.info(
             "Row %d: cell_text length=%d, target length=%d, match=%s",
             row_index, len(cell_text), len(target), cell_text == target,
