@@ -9,12 +9,26 @@ HIPAA: no PHI values appear in any log call.
 """
 
 import logging
+from pathlib import Path
+
+import yaml
 from pywinauto import Application
 from pywinauto.timings import TimeoutError as PWTimeoutError
 
 from app.config import settings
 from app.models.print_labels import PrintLabelsPayload
 from app.shared.epd_connect import connect_to_epower
+
+_CONFIG_PATH = Path(__file__).parent.parent.parent / "config.yaml"
+
+
+def _load_provider_name() -> str:
+    """Load the selected provider name from config.yaml."""
+    with open(_CONFIG_PATH, "r") as f:
+        cfg = yaml.safe_load(f)
+    names = cfg["providers"]["names"]
+    index = cfg["providers"]["selected_index"]
+    return names[index]
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +106,39 @@ def _select_registration_labels(app: Application) -> None:
         raise RuntimeError("View button unavailable.")
 
 
+def _fill_provider_name(app: Application, provider_name: str) -> None:
+    """
+    In the Add Provider dialog (frmInputBox), type the provider name and click Record.
+    """
+    try:
+        main_win = app.window(auto_id="frmMain")
+        add_provider_win = main_win.child_window(auto_id="frmInputBox", control_type="Window")
+        add_provider_win.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Add Provider dialog visible.")
+    except PWTimeoutError:
+        logger.error("Add Provider dialog did not appear.")
+        raise RuntimeError("Add Provider dialog did not open after clicking View.")
+
+    try:
+        text_box = add_provider_win.child_window(auto_id="TextBox1", control_type="Edit")
+        text_box.wait("visible enabled", timeout=settings.ui_timeout)
+        text_box.set_edit_text("")
+        text_box.type_keys(provider_name, with_spaces=True)
+        logger.info("Provider name typed.")
+    except PWTimeoutError:
+        logger.error("Provider name text box not found.")
+        raise RuntimeError("Provider name input unavailable.")
+
+    try:
+        record_btn = add_provider_win.child_window(auto_id="btnOk", control_type="Button")
+        record_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        record_btn.click_input()
+        logger.info("Record clicked.")
+    except PWTimeoutError:
+        logger.error("Record button not found.")
+        raise RuntimeError("Record button unavailable.")
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def run(payload: PrintLabelsPayload) -> dict:
@@ -102,9 +149,13 @@ def run(payload: PrintLabelsPayload) -> dict:
     """
     logger.info("Print labels flow started.")
 
+    provider_name = _load_provider_name()
+    logger.info("Provider loaded from config.")
+
     app = connect_to_epower()
     _click_patient_row(app, payload)
     _select_registration_labels(app)
+    _fill_provider_name(app, provider_name)
 
     logger.info("Print labels flow completed.")
     return {"status": "success"}

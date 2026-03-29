@@ -1,0 +1,7 @@
+providers:
+  names:
+    - DR. SMITH, JANE
+    - DR. DOE, JOHN
+    - DR. JOHNSON, EMILY
+    - DR. BROWN, MICHAEL
+  selected_index: 0
