@@ -139,6 +139,64 @@ def _fill_provider_name(app: Application, provider_name: str) -> None:
         raise RuntimeError("Record button unavailable.")
 
 
+def _click_properties(app: Application) -> None:
+    """
+    In the Windows Print dialog, click Properties...
+    """
+    try:
+        main_win = app.window(auto_id="frmMain")
+        print_dialog = main_win.child_window(title="Print", control_type="Window")
+        print_dialog.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Print dialog visible.")
+    except PWTimeoutError:
+        logger.error("Print dialog did not appear.")
+        raise RuntimeError("Print dialog did not open after clicking print icon.")
+
+    try:
+        props_btn = print_dialog.child_window(auto_id="1025", control_type="Button")
+        props_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        props_btn.click_input()
+        logger.info("Properties... clicked.")
+    except PWTimeoutError:
+        logger.error("Properties button not found.")
+        raise RuntimeError("Properties button unavailable in Print dialog.")
+
+
+def _set_paper_source(app: Application) -> None:
+    """
+    In the printer Document Properties dialog, set Paper Source to
+    Multipurpose Tray and click OK.
+    """
+    try:
+        main_win = app.window(auto_id="frmMain")
+        props_dialog = main_win.child_window(
+            title="Main Copier/Printer Document Properties", control_type="Window"
+        )
+        props_dialog.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Document Properties dialog visible.")
+    except PWTimeoutError:
+        logger.error("Document Properties dialog did not appear.")
+        raise RuntimeError("Document Properties dialog did not open.")
+
+    try:
+        paper_source = props_dialog.child_window(auto_id="1202", control_type="ComboBox")
+        paper_source.wait("visible enabled", timeout=settings.ui_timeout)
+        paper_source.select("Multipurpose Tray")
+        logger.info("Paper Source set to Multipurpose Tray.")
+    except PWTimeoutError:
+        logger.error("Paper Source combobox not found.")
+        raise RuntimeError("Paper Source combobox unavailable.")
+
+    try:
+        ok_btn = props_dialog.child_window(auto_id="1", control_type="Button")
+        ok_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        ok_btn.click_input()
+        logger.info("Document Properties OK clicked.")
+    except PWTimeoutError:
+        logger.error("OK button not found in Document Properties.")
+        raise RuntimeError("OK button unavailable in Document Properties dialog.")
+
+
 def _click_print_icon(app: Application) -> None:
     """
     In the Document Viewer (frmTemplatePreview), click the Print toolbar icon.
@@ -181,6 +239,8 @@ def run(payload: PrintLabelsPayload) -> dict:
     _select_registration_labels(app)
     _fill_provider_name(app, provider_name)
     _click_print_icon(app)
+    _click_properties(app)
+    _set_paper_source(app)
 
     logger.info("Print labels flow completed.")
     return {"status": "success"}
