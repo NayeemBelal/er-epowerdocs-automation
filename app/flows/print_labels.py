@@ -246,6 +246,34 @@ def _click_print_icon(app: Application) -> None:
         raise RuntimeError("Print icon unavailable in Document Viewer toolbar.")
 
 
+def _exit_document_viewer(app: Application) -> None:
+    """Click Exit on the EPOWERdoc Document Viewer."""
+    try:
+        main_win = app.window(auto_id="frmMain")
+        viewer = main_win.child_window(auto_id="frmTemplatePreview", control_type="Window")
+        exit_btn = viewer.child_window(auto_id="btnExit", control_type="Button")
+        exit_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        exit_btn.click_input()
+        logger.info("Document Viewer exited.")
+    except PWTimeoutError:
+        logger.error("Exit button not found on Document Viewer.")
+        raise RuntimeError("Could not exit Document Viewer.")
+
+
+def _exit_patient_menu(app: Application) -> None:
+    """Click Exit on the Patient Menu."""
+    try:
+        main_win = app.window(auto_id="frmMain")
+        pat_menu = main_win.child_window(auto_id="frmPatMenu", control_type="Window")
+        exit_btn = pat_menu.child_window(auto_id="cmdClose", control_type="Button")
+        exit_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        exit_btn.click_input()
+        logger.info("Patient Menu exited.")
+    except PWTimeoutError:
+        logger.error("Exit button not found on Patient Menu.")
+        raise RuntimeError("Could not exit Patient Menu.")
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def run(payload: PrintLabelsPayload) -> dict:
@@ -267,6 +295,8 @@ def run(payload: PrintLabelsPayload) -> dict:
     _click_properties(app)
     _set_paper_source(app)
     _click_print_dialog_ok(app)
+    _exit_document_viewer(app)
+    _exit_patient_menu(app)
 
     logger.info("Print labels flow completed.")
     return {"status": "success"}
