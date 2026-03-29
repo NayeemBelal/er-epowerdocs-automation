@@ -37,3 +37,7 @@ class InputDemographicsPayload(BaseModel):
 
     # Optional — no EPD default; omit from payload to leave unset
     how_did_you_hear: Optional[str] = None
+
+    # Guarantor — omit both for adults (Same as Patient); provide both for minors
+    guardian_first_name: Optional[str] = None
+    guardian_last_name: Optional[str] = None

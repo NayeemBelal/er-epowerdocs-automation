@@ -11,7 +11,7 @@ HIPAA: no PHI values appear in any log call.
 
 import logging
 
-from pywinauto import Application
+from pywinauto import Application, timings
 from pywinauto.timings import TimeoutError as PWTimeoutError
 
 from app.config import settings
@@ -30,11 +30,9 @@ def _set_edit(parent, auto_id: str, value: str, field_name: str) -> None:
     if not value:
         return
     try:
-        field = parent.child_window(auto_id=auto_id, control_type="Edit")
-        field.wait("visible enabled", timeout=settings.ui_timeout)
-        field.set_edit_text(value.upper())
+        parent.child_window(auto_id=auto_id, control_type="Edit").set_edit_text(value.upper())
         logger.info("Edit set: %s", field_name)
-    except PWTimeoutError:
+    except Exception:
         logger.error("Edit field not found: %s", field_name)
         raise RuntimeError(f"{field_name} field unavailable in Registration screen.")
 
@@ -45,11 +43,10 @@ def _set_combo(parent, auto_id: str, value: str, field_name: str) -> None:
         return
     try:
         combo = parent.child_window(auto_id=auto_id, control_type="ComboBox")
-        combo.wait("visible enabled", timeout=settings.ui_timeout)
         combo.click_input()
         combo.child_window(title=value, control_type="ListItem").click_input()
         logger.info("ComboBox set: %s", field_name)
-    except PWTimeoutError:
+    except Exception:
         logger.error("ComboBox or option not found: %s", field_name)
         raise RuntimeError(f"{field_name} option unavailable in Registration screen.")
 
@@ -60,13 +57,9 @@ def _set_list(parent, auto_id: str, value: str, field_name: str) -> None:
         return
     try:
         list_box = parent.child_window(auto_id=auto_id, control_type="List")
-        list_box.wait("visible", timeout=settings.ui_timeout)
         list_box.set_focus()
         list_box.child_window(title=value, control_type="ListItem").click_input()
         logger.info("ListBox set: %s", field_name)
-    except PWTimeoutError:
-        logger.error("ListBox not found: %s", field_name)
-        raise RuntimeError(f"{field_name} ListBox unavailable in Registration screen.")
     except Exception:
         logger.exception("Failed to select item in ListBox: %s", field_name)
         raise RuntimeError(f"Could not select {field_name} — verify option name matches exactly.")
@@ -174,16 +167,68 @@ def _fill_demographics(app: Application, payload: InputDemographicsPayload) -> N
     if payload.how_did_you_hear:
         try:
             combo = pat_info.child_window(auto_id="cbAboutUsSource", control_type="ComboBox")
-            combo.wait("visible enabled", timeout=settings.ui_timeout)
             edit = combo.child_window(auto_id="1001", control_type="Edit")
             edit.set_edit_text(payload.how_did_you_hear.upper())
             logger.info("How did you hear about us set.")
-        except PWTimeoutError:
+        except Exception:
             logger.error("How did you hear about us field not found.")
             raise RuntimeError("How did you hear about us field unavailable in Registration screen.")
 
-    # Save and Close
+
+def _fill_guarantor(app: Application, payload: InputDemographicsPayload) -> None:
+    """
+    Fill the Guarantor/Responsible section.
+    - Adult (no guardian names): check Same as Patient.
+    - Minor (guardian names provided): fill Last/First, check Same address + Same phones.
+    """
+    main_win = app.window(auto_id="frmMain")
+    reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
+    guarantor = reg_win.child_window(auto_id="GroupBox1", control_type="Group")
+
+    is_minor = bool(payload.guardian_first_name and payload.guardian_last_name)
+
+    if not is_minor:
+        try:
+            chk = guarantor.child_window(auto_id="ckGSameAsPatient", control_type="CheckBox")
+            if chk.get_toggle_state() != 1:
+                chk.click_input()
+            logger.info("Guarantor: Same as Patient checked.")
+        except Exception:
+            logger.error("Same as Patient checkbox not found.")
+            raise RuntimeError("Same as Patient checkbox unavailable.")
+    else:
+        try:
+            guarantor.child_window(auto_id="txtGLast",  control_type="Edit").set_edit_text(payload.guardian_last_name.upper())
+            guarantor.child_window(auto_id="txtGFirst", control_type="Edit").set_edit_text(payload.guardian_first_name.upper())
+            logger.info("Guarantor name filled.")
+        except Exception:
+            logger.error("Guarantor name fields not found.")
+            raise RuntimeError("Guarantor name fields unavailable.")
+
+        try:
+            chk_addr = guarantor.child_window(auto_id="ckGSameAddress", control_type="CheckBox")
+            if chk_addr.get_toggle_state() != 1:
+                chk_addr.click_input()
+            logger.info("Guarantor: Same address checked.")
+        except Exception:
+            logger.error("Same address checkbox not found.")
+            raise RuntimeError("Same address checkbox unavailable.")
+
+        try:
+            chk_phones = guarantor.child_window(auto_id="ckGSamePhones", control_type="CheckBox")
+            if chk_phones.get_toggle_state() != 1:
+                chk_phones.click_input()
+            logger.info("Guarantor: Same phones checked.")
+        except Exception:
+            logger.error("Same phones checkbox not found.")
+            raise RuntimeError("Same phones checkbox unavailable.")
+
+
+def _save_and_close(app: Application) -> None:
+    """Click Save and Close on the Registration screen."""
     try:
+        main_win = app.window(auto_id="frmMain")
+        reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
         save_btn = reg_win.child_window(auto_id="btnSaveClose", control_type="Button")
         save_btn.wait("visible enabled", timeout=settings.ui_timeout)
         save_btn.click_input()
@@ -202,11 +247,14 @@ def run(payload: InputDemographicsPayload) -> dict:
     Returns {"status": "success"} or raises RuntimeError (no PHI in message).
     """
     logger.info("Input demographics flow started.")
+    timings.Timings.fast()
 
     app = connect_to_epower()
     _click_patient_row(app, payload)
     _click_demographics(app)
     _fill_demographics(app, payload)
+    _fill_guarantor(app, payload)
+    _save_and_close(app)
 
     logger.info("Input demographics flow completed.")
     return {"status": "success"}
