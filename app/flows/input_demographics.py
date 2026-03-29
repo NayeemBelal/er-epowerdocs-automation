@@ -242,6 +242,7 @@ def _fill_employer_tab(app: Application, payload: InputDemographicsPayload) -> N
         main_win = app.window(auto_id="frmMain")
         reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
         emp_pane = reg_win.child_window(auto_id="tbEmp", control_type="Pane")
+        emp_pane.wait("visible", timeout=settings.ui_timeout)
         emp_pane.child_window(auto_id="txtEmpName", control_type="Edit").set_edit_text(payload.employer_name.upper())
         logger.info("Employer name filled.")
     except Exception:
@@ -269,6 +270,7 @@ def _fill_primary_ins_tab(app: Application, payload: InputDemographicsPayload) -
     main_win = app.window(auto_id="frmMain")
     reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
     pane = reg_win.child_window(auto_id="tbPri", control_type="Pane")
+    pane.wait("visible", timeout=settings.ui_timeout)
 
     # Insured section — Same as Patient (adult) or Same as Guarantor (minor)
     is_minor = bool(payload.guardian_first_name and payload.guardian_last_name)
@@ -310,6 +312,9 @@ def _fill_primary_ins_tab(app: Application, payload: InputDemographicsPayload) -
     # Policy / group numbers
     _set_edit(ins, "txt1InsPolicy", payload.ins_policy_number, "policy number")
     _set_edit(ins, "txt1InsGroup",  payload.ins_group_number,  "group number")
+
+    # Notes
+    _set_edit(ins, "txt1InsNotes", payload.ins_notes, "insurance notes")
 
     logger.info("Primary Ins. tab filled.")
 

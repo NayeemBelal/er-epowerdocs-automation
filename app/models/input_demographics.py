@@ -52,3 +52,4 @@ class InputDemographicsPayload(BaseModel):
     ins_phone: Optional[str] = None
     ins_policy_number: Optional[str] = None
     ins_group_number: Optional[str] = None
+    ins_notes: str = "03/29/2026 -SB\nINS IS ACTIVE. COPAY $250. COINS 25%\n$250 COLLECTED AT TOS.."
