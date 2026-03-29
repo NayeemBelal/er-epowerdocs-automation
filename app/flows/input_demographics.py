@@ -3,6 +3,8 @@ flows/input_demographics.py — Input demographics flow.
 
 1. Click the correct patient row on the EPD main tracking screen.
 2. In the Patient Menu (frmPatMenu), click Demographics.
+3. In the Registration screen (frmRegistration / gbPatient), fill all
+   demographic fields and click Save and Close.
 
 HIPAA: no PHI values appear in any log call.
 """
@@ -20,6 +22,53 @@ logger = logging.getLogger(__name__)
 
 _MAX_ROWS = 50
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _set_edit(parent, auto_id: str, value: str, field_name: str) -> None:
+    """Set the text of an Edit control. Skips silently if value is falsy."""
+    if not value:
+        return
+    try:
+        field = parent.child_window(auto_id=auto_id, control_type="Edit")
+        field.wait("visible enabled", timeout=settings.ui_timeout)
+        field.set_edit_text(value)
+        logger.info("Edit set: %s", field_name)
+    except PWTimeoutError:
+        logger.error("Edit field not found: %s", field_name)
+        raise RuntimeError(f"{field_name} field unavailable in Registration screen.")
+
+
+def _set_combo(parent, auto_id: str, value: str, field_name: str) -> None:
+    """Expand a ComboBox and click the matching ListItem."""
+    if not value:
+        return
+    try:
+        combo = parent.child_window(auto_id=auto_id, control_type="ComboBox")
+        combo.wait("visible enabled", timeout=settings.ui_timeout)
+        combo.click_input()
+        combo.child_window(title=value, control_type="ListItem").click_input()
+        logger.info("ComboBox set: %s", field_name)
+    except PWTimeoutError:
+        logger.error("ComboBox or option not found: %s", field_name)
+        raise RuntimeError(f"{field_name} option unavailable in Registration screen.")
+
+
+def _set_list(parent, auto_id: str, value: str, field_name: str) -> None:
+    """Click a ListItem inside a ListBox control."""
+    if not value:
+        return
+    try:
+        list_box = parent.child_window(auto_id=auto_id, control_type="List")
+        list_box.wait("visible", timeout=settings.ui_timeout)
+        list_box.child_window(title=value, control_type="ListItem").click_input()
+        logger.info("ListBox set: %s", field_name)
+    except PWTimeoutError:
+        logger.error("ListBox or item not found: %s", field_name)
+        raise RuntimeError(f"{field_name} option unavailable in Registration screen.")
+
+
+# ── Flow steps ────────────────────────────────────────────────────────────────
 
 def _click_patient_row(app: Application, payload: InputDemographicsPayload) -> None:
     """
@@ -59,9 +108,7 @@ def _click_patient_row(app: Application, payload: InputDemographicsPayload) -> N
 
 
 def _click_demographics(app: Application) -> None:
-    """
-    In the Patient Menu, click the Demographics button.
-    """
+    """In the Patient Menu, click the Demographics button."""
     try:
         main_win = app.window(auto_id="frmMain")
         pat_menu = main_win.child_window(auto_id="frmPatMenu", control_type="Window")
@@ -81,6 +128,58 @@ def _click_demographics(app: Application) -> None:
         raise RuntimeError("Demographics button unavailable in Patient Menu.")
 
 
+def _fill_demographics(app: Application, payload: InputDemographicsPayload) -> None:
+    """
+    In the Registration screen, fill all demographic fields on the
+    Patient Information tab and click Save and Close.
+    """
+    try:
+        main_win = app.window(auto_id="frmMain")
+        reg_win = main_win.child_window(auto_id="frmRegistration", control_type="Window")
+        reg_win.wait("visible", timeout=settings.ui_timeout)
+        logger.info("Registration screen visible.")
+    except PWTimeoutError:
+        logger.error("Registration screen did not appear after clicking Demographics.")
+        raise RuntimeError("Registration screen did not open.")
+
+    pat_info = reg_win.child_window(auto_id="gbPatient", control_type="Group")
+
+    # Address
+    _set_edit(pat_info, "txtAdd1",  payload.address,  "address")
+    _set_edit(pat_info, "txtCity",  payload.city,     "city")
+    _set_edit(pat_info, "txtState", payload.state,    "state")
+    _set_edit(pat_info, "txtZip",   payload.zip_code, "zip")
+
+    # Contact
+    _set_edit(pat_info, "txtEmail", payload.email, "email")
+
+    # SSN — always written; defaults to 000000000
+    _set_edit(pat_info, "txtSSN", payload.ssn, "SSN")
+
+    # Dropdowns with defaults
+    _set_combo(pat_info, "cbMarital",           payload.marital_status,    "marital status")
+    _set_combo(pat_info, "cbEmployment",         payload.employment_status, "employment status")
+    _set_combo(pat_info, "cbReligion",           payload.religion,          "religion")
+    _set_combo(pat_info, "cbPreferredLanguage",  payload.preferred_language, "preferred language")
+    _set_combo(pat_info, "cbEtnicity",           payload.ethnicity,         "ethnicity")
+
+    # Race — ListBox, not ComboBox
+    _set_list(pat_info, "LstRace", payload.race, "race")
+
+    # How did you hear about us — optional, no EPD default
+    _set_combo(pat_info, "cbAboutUsSource", payload.how_did_you_hear, "how did you hear about us")
+
+    # Save and Close
+    try:
+        save_btn = reg_win.child_window(auto_id="btnSaveClose", control_type="Button")
+        save_btn.wait("visible enabled", timeout=settings.ui_timeout)
+        save_btn.click_input()
+        logger.info("Save and Close clicked.")
+    except PWTimeoutError:
+        logger.error("Save and Close button not found.")
+        raise RuntimeError("Save and Close button unavailable on Registration screen.")
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def run(payload: InputDemographicsPayload) -> dict:
@@ -94,6 +193,7 @@ def run(payload: InputDemographicsPayload) -> dict:
     app = connect_to_epower()
     _click_patient_row(app, payload)
     _click_demographics(app)
+    _fill_demographics(app, payload)
 
     logger.info("Input demographics flow completed.")
     return {"status": "success"}
