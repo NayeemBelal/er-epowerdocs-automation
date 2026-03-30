@@ -14,7 +14,7 @@ HIPAA: no PHI values appear in any log call.
 
 import logging
 import time
-from pywinauto import Application
+from pywinauto import Application, timings
 from pywinauto.timings import TimeoutError as PWTimeoutError
 
 from app.config import settings
@@ -170,6 +170,7 @@ def run(payload: RegisterPatientPayload) -> dict:
     Returns {"status": "success"} or raises RuntimeError (no PHI in message).
     """
     logger.info("Register patient flow started.")
+    timings.Timings.fast()
 
     app = connect_to_epower()
     search_win = _open_add_patient(app)

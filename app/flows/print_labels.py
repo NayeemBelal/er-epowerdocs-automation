@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 import yaml
-from pywinauto import Application
+from pywinauto import Application, timings
 from pywinauto.timings import TimeoutError as PWTimeoutError
 
 from app.config import settings
@@ -283,6 +283,7 @@ def run(payload: PrintLabelsPayload) -> dict:
     Returns {"status": "success"} or raises RuntimeError (no PHI in message).
     """
     logger.info("Print labels flow started.")
+    timings.Timings.fast()
 
     provider_name = _load_provider_name()
     logger.info("Provider loaded from config.")
